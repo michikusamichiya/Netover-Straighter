@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Pairing from './pages/Pairing';
 import Manage from './pages/Manage';
 import Launch from './pages/Launch';
+import Config from './pages/Config';
 
 const PageMotion = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
@@ -58,6 +59,14 @@ function AppRoutes() {
           element={
             <PageMotion>
               <Launch />
+            </PageMotion>
+          }
+        />
+        <Route 
+          path="/config"
+          element={
+            <PageMotion>
+              <Config />
             </PageMotion>
           }
         />

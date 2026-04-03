@@ -391,7 +391,9 @@ pub async fn start_pairing(state: State<'_, AppState>, app: AppHandle) -> Result
     session.host_private_key = Some(secret);
     session.host_public_key = Some(public);
 
-    let ws = match WsClient::new("ws://localhost:3001/ws/pairing/remote", handle_message).await {
+    let config = crate::config::config_main::get_config(app.clone()).unwrap_or_default();
+    let url = format!("{}/ws/pairing/remote", config.server_url);
+    let ws = match WsClient::new(&url, handle_message).await {
         Ok(ws) => ws,
         Err(_) => {
             emit_safer(

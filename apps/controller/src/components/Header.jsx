@@ -46,6 +46,7 @@ export default function Header() {
             <Link to="/pairing" className="hover:text-black">Pairing</Link>
             <Link to="/access" className="hover:text-black">Remote Control</Link>
             <Link to="/help" className="hover:text-black">Tutorial</Link>
+            <Link to="/config" className="hover:text-black">Settings</Link>
             {user ? (
               <>
                 <Link to="/dashboard" className="hover:text-black">Dashboard</Link>
@@ -103,6 +104,13 @@ export default function Header() {
               onClick={() => setOpenWhenSmart(false)}
             >
               Tutorial
+            </Link>
+            <Link 
+              to="/config" 
+              className="text-neutral-900 hover:text-black py-2 border-b border-neutral-200"
+              onClick={() => setOpenWhenSmart(false)}
+            >
+              Settings
             </Link>
             {user ? (
               <>

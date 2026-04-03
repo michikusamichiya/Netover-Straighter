@@ -22,6 +22,9 @@ export default function Home() {
       <CustomButton text="Manage keys" onClick={() => {
         navigate("/managekey");
       }} additionClass="bg-yellow-600 text-white" />
+      <CustomButton text="Settings" onClick={() => {
+        navigate("/config");
+      }} additionClass="bg-gray-600 text-white" />
     </div>
   )
 }

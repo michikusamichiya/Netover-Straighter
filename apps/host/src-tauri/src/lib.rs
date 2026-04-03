@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod appstate;
+mod config;
 mod pairing;
 mod manage;
 mod ws;
@@ -38,6 +39,8 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
+      config::config_main::get_config,
+      config::config_main::set_config,
       pairing::pairing_main::start_pairing,
       pairing::pairing_main::end_pairing,
       pairing::pairing_main::accept,

@@ -803,7 +803,9 @@ pub async fn launch(app: AppHandle, state: State<'_, AppState>) -> Result<(), St
     }
  
     let keys = loadkeys(app.clone()).await?;
-    let ws = WsClient::new("ws://localhost:3001/ws/launch/target", handle_message)
+    let app_config = crate::config::config_main::get_config(app.clone()).unwrap_or_default();
+    let url = format!("{}/ws/launch/target", app_config.server_url);
+    let ws = WsClient::new(&url, handle_message)
         .await
         .map_err(|e| e.to_string())?;
  
