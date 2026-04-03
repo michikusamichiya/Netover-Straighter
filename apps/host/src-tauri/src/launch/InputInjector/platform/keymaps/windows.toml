@@ -1,0 +1,147 @@
+[KeyA]
+scancode = 30
+extended = false
+
+[KeyB]
+scancode = 48
+extended = false
+
+[KeyC]
+scancode = 46
+extended = false
+
+[KeyD]
+scancode = 32
+extended = false
+
+[KeyE]
+scancode = 18
+extended = false
+
+[KeyF]
+scancode = 33
+extended = false
+
+[KeyG]
+scancode = 34
+extended = false
+
+[KeyH]
+scancode = 35
+extended = false
+
+[KeyI]
+scancode = 23
+extended = false
+
+[KeyJ]
+scancode = 36
+extended = false
+
+[KeyK]
+scancode = 37
+extended = false
+
+[KeyL]
+scancode = 38
+extended = false
+
+[KeyM]
+scancode = 50
+extended = false
+
+[KeyN]
+scancode = 49
+extended = false
+
+[KeyO]
+scancode = 24
+extended = false
+
+[KeyP]
+scancode = 25
+extended = false
+
+[KeyQ]
+scancode = 16
+extended = false
+
+[KeyR]
+scancode = 19
+extended = false
+
+[KeyS]
+scancode = 31
+extended = false
+
+[KeyT]
+scancode = 20
+extended = false
+
+[KeyU]
+scancode = 22
+extended = false
+
+[KeyV]
+scancode = 47
+extended = false
+
+[KeyW]
+scancode = 17
+extended = false
+
+[KeyX]
+scancode = 45
+extended = false
+
+[KeyY]
+scancode = 21
+extended = false
+
+[KeyZ]
+scancode = 44
+extended = false
+
+[ShiftLeft]
+scancode = 42
+extended = false
+
+[ShiftRight]
+scancode = 54
+extended = false
+
+[Space]
+scancode = 57
+extended = false
+
+[Enter]
+scancode = 28
+extended = false
+
+[Backspace]
+scancode = 14
+extended = false
+
+[Tab]
+scancode = 15
+extended = false
+
+[Escape]
+scancode = 1
+extended = false
+
+[ArrowLeft]
+scancode = 75
+extended = true
+
+[ArrowRight]
+scancode = 77
+extended = true
+
+[ArrowUp]
+scancode = 72
+extended = true
+
+[ArrowDown]
+scancode = 80
+extended = true
