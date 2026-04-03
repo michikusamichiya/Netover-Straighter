@@ -1,0 +1,423 @@
+# Windows keymap configuration
+# Keys are named by Web KeyboardEvent code values (e.g. KeyA, Space, ArrowUp)
+
+# --- Alphanumeric ---
+[KeyA]
+scancode = 30
+extended = false
+
+[KeyB]
+scancode = 48
+extended = false
+
+[KeyC]
+scancode = 46
+extended = false
+
+[KeyD]
+scancode = 32
+extended = false
+
+[KeyE]
+scancode = 18
+extended = false
+
+[KeyF]
+scancode = 33
+extended = false
+
+[KeyG]
+scancode = 34
+extended = false
+
+[KeyH]
+scancode = 35
+extended = false
+
+[KeyI]
+scancode = 23
+extended = false
+
+[KeyJ]
+scancode = 36
+extended = false
+
+[KeyK]
+scancode = 37
+extended = false
+
+[KeyL]
+scancode = 38
+extended = false
+
+[KeyM]
+scancode = 50
+extended = false
+
+[KeyN]
+scancode = 49
+extended = false
+
+[KeyO]
+scancode = 24
+extended = false
+
+[KeyP]
+scancode = 25
+extended = false
+
+[KeyQ]
+scancode = 16
+extended = false
+
+[KeyR]
+scancode = 19
+extended = false
+
+[KeyS]
+scancode = 31
+extended = false
+
+[KeyT]
+scancode = 20
+extended = false
+
+[KeyU]
+scancode = 22
+extended = false
+
+[KeyV]
+scancode = 47
+extended = false
+
+[KeyW]
+scancode = 17
+extended = false
+
+[KeyX]
+scancode = 45
+extended = false
+
+[KeyY]
+scancode = 21
+extended = false
+
+[KeyZ]
+scancode = 44
+extended = false
+
+# --- Digits ---
+[Digit1]
+scancode = 2
+extended = false
+
+[Digit2]
+scancode = 3
+extended = false
+
+[Digit3]
+scancode = 4
+extended = false
+
+[Digit4]
+scancode = 5
+extended = false
+
+[Digit5]
+scancode = 6
+extended = false
+
+[Digit6]
+scancode = 7
+extended = false
+
+[Digit7]
+scancode = 8
+extended = false
+
+[Digit8]
+scancode = 9
+extended = false
+
+[Digit9]
+scancode = 10
+extended = false
+
+[Digit0]
+scancode = 11
+extended = false
+
+# --- Special / Whitespace ---
+[Space]
+scancode = 57
+extended = false
+
+[Enter]
+scancode = 28
+extended = false
+
+[Backspace]
+scancode = 14
+extended = false
+
+[Tab]
+scancode = 15
+extended = false
+
+[Escape]
+scancode = 1
+extended = false
+
+[CapsLock]
+scancode = 58
+extended = false
+
+# --- Modifier keys ---
+[ShiftLeft]
+scancode = 42
+extended = false
+
+[ShiftRight]
+scancode = 54
+extended = false
+
+[ControlLeft]
+scancode = 29
+extended = false
+
+[ControlRight]
+scancode = 29
+extended = true
+
+[AltLeft]
+scancode = 56
+extended = false
+
+[AltRight]
+scancode = 56
+extended = true
+
+[MetaLeft]
+scancode = 91
+extended = true
+
+[MetaRight]
+scancode = 92
+extended = true
+
+# --- Punctuation ---
+[Minus]
+scancode = 12
+extended = false
+
+[Equal]
+scancode = 13
+extended = false
+
+[BracketLeft]
+scancode = 26
+extended = false
+
+[BracketRight]
+scancode = 27
+extended = false
+
+[Backslash]
+scancode = 43
+extended = false
+
+[Semicolon]
+scancode = 39
+extended = false
+
+[Quote]
+scancode = 40
+extended = false
+
+[Backquote]
+scancode = 41
+extended = false
+
+[Comma]
+scancode = 51
+extended = false
+
+[Period]
+scancode = 52
+extended = false
+
+[Slash]
+scancode = 53
+extended = false
+
+# --- Navigation ---
+[ArrowUp]
+scancode = 72
+extended = true
+
+[ArrowDown]
+scancode = 80
+extended = true
+
+[ArrowLeft]
+scancode = 75
+extended = true
+
+[ArrowRight]
+scancode = 77
+extended = true
+
+[Home]
+scancode = 71
+extended = true
+
+[End]
+scancode = 79
+extended = true
+
+[PageUp]
+scancode = 73
+extended = true
+
+[PageDown]
+scancode = 81
+extended = true
+
+[Insert]
+scancode = 82
+extended = true
+
+[Delete]
+scancode = 83
+extended = true
+
+# --- Function keys ---
+[F1]
+scancode = 59
+extended = false
+
+[F2]
+scancode = 60
+extended = false
+
+[F3]
+scancode = 61
+extended = false
+
+[F4]
+scancode = 62
+extended = false
+
+[F5]
+scancode = 63
+extended = false
+
+[F6]
+scancode = 64
+extended = false
+
+[F7]
+scancode = 65
+extended = false
+
+[F8]
+scancode = 66
+extended = false
+
+[F9]
+scancode = 67
+extended = false
+
+[F10]
+scancode = 68
+extended = false
+
+[F11]
+scancode = 87
+extended = false
+
+[F12]
+scancode = 88
+extended = false
+
+# --- Numpad ---
+[Numpad0]
+scancode = 82
+extended = false
+
+[Numpad1]
+scancode = 79
+extended = false
+
+[Numpad2]
+scancode = 80
+extended = false
+
+[Numpad3]
+scancode = 81
+extended = false
+
+[Numpad4]
+scancode = 75
+extended = false
+
+[Numpad5]
+scancode = 76
+extended = false
+
+[Numpad6]
+scancode = 77
+extended = false
+
+[Numpad7]
+scancode = 71
+extended = false
+
+[Numpad8]
+scancode = 72
+extended = false
+
+[Numpad9]
+scancode = 73
+extended = false
+
+[NumpadAdd]
+scancode = 78
+extended = false
+
+[NumpadSubtract]
+scancode = 74
+extended = false
+
+[NumpadMultiply]
+scancode = 55
+extended = false
+
+[NumpadDivide]
+scancode = 53
+extended = true
+
+[NumpadDecimal]
+scancode = 83
+extended = false
+
+[NumpadEnter]
+scancode = 28
+extended = true
+
+[NumLock]
+scancode = 69
+extended = true
+
+# --- Other ---
+[PrintScreen]
+scancode = 55
+extended = true
+
+[ScrollLock]
+scancode = 70
+extended = false
+
+[Pause]
+scancode = 69
+extended = false

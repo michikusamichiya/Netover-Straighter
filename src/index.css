@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  --color-netover_bg: #111111;
+  --color-netover_text: #D5D5D5;
+  --color-netover_blue: #1A95FF;
+  --color-netover_green: #8ACC00;
+}
