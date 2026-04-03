@@ -1,5 +1,6 @@
 import { createDHPair, createSharedSecret, getHash, exportPublicKey, importPublicKey, hkdf, bytesToBase64, sha256, concatSorted } from "./crypto";
 import { downloadText } from "./tools.js";
+import { getSettings } from "./settings.js";
 
 export const STATUS = {
   INTERACTIVE: "interactive",
@@ -78,7 +79,7 @@ export function createPairingService({
       const publicKeyBytes = await exportPublicKey(pair.publicKey);
       const publicKeyArray = Array.from(publicKeyBytes);
 
-      wss = new WebSocket(`${import.meta.env.VITE_WEBSOCKET_SERVER}/ws/pairing/local`);
+      wss = new WebSocket(`${getSettings().serverUrl}/ws/pairing/local`);
 
       wss.onopen = async () => {
         try {

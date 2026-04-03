@@ -1,6 +1,7 @@
 import React from "react";
 import { base64ToBytes, hmacSign } from "./crypto";
 import { PercentDiamondIcon } from "lucide-react";
+import { getSettings } from "./settings.js";
 
 export const STATUS = {
   INTERACTIVE: "interactive",
@@ -59,7 +60,7 @@ export function createLaunchService({
   };
   const start = async () => {
     setStatus(STATUS.CONNECTING);
-    wss = new WebSocket(`${import.meta.env.VITE_WEBSOCKET_SERVER}/ws/launch/controller`);
+    wss = new WebSocket(`${getSettings().serverUrl}/ws/launch/controller`);
 
     wss.onopen = async () => {
       try {

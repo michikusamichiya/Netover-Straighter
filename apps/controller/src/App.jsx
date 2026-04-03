@@ -13,6 +13,7 @@ import Logout from "./pages/Logout";
 import Dashboard from "./pages/Dashboard";
 import Pairing from "./pages/Pairing";
 import Launch from "./pages/launch/Launch";
+import Config from "./pages/Config";
 
 // ページ切り替えアニメーション用ラッパー
 const PageMotion = ({ children }) => (
@@ -92,6 +93,14 @@ export default function App() {
               element={
                 <PageMotion>
                   <Launch />
+                </PageMotion>
+              }
+            />
+            <Route
+              path="/config"
+              element={
+                <PageMotion>
+                  <Config />
                 </PageMotion>
               }
             />
