@@ -1,5 +1,6 @@
 export const DEFAULT_SETTINGS = {
-  serverUrl: "ws://localhost:3001"
+  serverUrl: "ws://localhost:3001",
+  gameMode: false
 };
 
 export function getSettings() {

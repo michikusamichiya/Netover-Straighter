@@ -3,7 +3,7 @@ import { getSettings, saveSettings } from "@/scripts/settings";
 import CustomButton from "@/components/CustomButton";
 
 export default function Config() {
-  const [settings, setSettingsState] = useState({ serverUrl: "" });
+  const [settings, setSettingsState] = useState({ serverUrl: "", gameMode: false });
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -30,6 +30,18 @@ export default function Config() {
             onChange={(e) => setSettingsState({ ...settings, serverUrl: e.target.value })}
             placeholder="ws://localhost:3001"
           />
+        </div>
+        
+        <div className="mb-4">
+          <label className="flex items-center space-x-2 text-sm font-bold mb-2 cursor-pointer">
+            <input 
+              type="checkbox"
+              className="form-checkbox h-4 w-4 text-netover_blue bg-white/10 border-gray-600 rounded focus:ring-netover_blue"
+              checked={settings.gameMode}
+              onChange={(e) => setSettingsState({ ...settings, gameMode: e.target.checked })}
+            />
+            <span>Gamemode Enable (Pointer Lock)</span>
+          </label>
         </div>
         
         <div className="mt-6 flex items-center justify-between">

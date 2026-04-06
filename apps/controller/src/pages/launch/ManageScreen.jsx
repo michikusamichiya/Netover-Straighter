@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { getSettings } from "@/scripts/settings";
 import { Loader, X, Cog, Terminal, Wallpaper } from "lucide-react";
 
 export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock, isOnLock }) {
@@ -12,8 +13,17 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
 
     const mouseFPS = 30;
 
+    const [gameMode, setGameMode] = useState(false);
+
+    useEffect(() => {
+        setGameMode(getSettings().gameMode);
+    }, []);
+
     useEffect(() => {
         isOnLockRef.current = isOnLock;
+        if (isOnLock && document.pointerLockElement) {
+            document.exitPointerLock();
+        }
     }, [isOnLock]);
 
     useEffect(() => {
@@ -204,6 +214,11 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     ref={canvasRef}
                     className="max-w-full max-h-full object-contain"
                     onMouseMove={handleMouseMove}
+                    onClick={() => {
+                        if (gameMode && !isOnLock && canvasRef.current) {
+                            canvasRef.current.requestPointerLock();
+                        }
+                    }}
                 />
 
                 {isOnLock && (
