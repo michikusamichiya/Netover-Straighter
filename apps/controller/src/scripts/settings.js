@@ -1,5 +1,5 @@
 export const DEFAULT_SETTINGS = {
-  serverUrl: "ws://localhost:3001",
+  serverUrl: import.meta.env.VITE_WEBSOCKET_SERVER || "ws://localhost:3001",
   gameMode: false
 };
 

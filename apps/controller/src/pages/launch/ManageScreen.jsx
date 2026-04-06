@@ -115,6 +115,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
 
         const handleMouseUp = (e) => {
             if (isOnLock) return;
+            if (e.target !== canvasRef.current && document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
             // console.log(e.code);
             if (isOnLockRef.current) return;
@@ -124,6 +125,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
 
         const handleMouseDown = (e) => {
             if (isOnLock) return;
+            if (e.target !== canvasRef.current && document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
             // console.log(e.code);
             if (isOnLockRef.current) return;
@@ -133,6 +135,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
         };
         const handleWheel = (e) => {
             if (isOnLock) return;
+            if (e.target !== canvasRef.current && document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
             // console.log(e.deltaY);
             launchService.sendData(`MOUSE_WHEEL ${e.deltaX} ${e.deltaY}`);
@@ -169,7 +172,8 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             x = Math.max(0, Math.min(1, x));
             y = Math.max(0, Math.min(1, y));
 
-            launchService.sendData(`MOUSE_MOVE_ABSOLUTE ${x} ${y}`);
+            if (!gameMode) launchService.sendData(`MOUSE_MOVE ${x} ${y}`);
+            else launchService.sendData(`MOUSE_MOVE_RELATIVE ${e.movementX} ${e.movementY}`);
         }
     };
 
@@ -183,7 +187,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     <X className="w-4 h-4" />
                 </button>
                 <button className="px-4 py-2 bg-netover_text text-netover_bg mr-2 rounded" onClick={() => {
-
+                    window.open('/config', 'configPopup', 'width=600,height=700');
                 }}>
                     <Cog className="w-4 h-4" />
                 </button>

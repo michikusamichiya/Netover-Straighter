@@ -85,6 +85,29 @@ impl MouseInjector for WindowsInputInjector {
     }
     Ok(())
   }
+  fn moverelative(&self, dx: i32, dy: i32) -> Result<(), PlatformError> {
+    unsafe {
+      let inputs = [INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+          mi: MOUSEINPUT {
+            dx,
+            dy,
+            mouseData: 0,
+            dwFlags: MOUSEEVENTF_MOVE,
+            time: 0,
+            dwExtraInfo: 0,
+          },
+        },
+      }];
+
+      let res = SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+      if res != inputs.len() as u32 {
+        return Err(PlatformError::APIError(res as i32));
+      }
+    }
+    Ok(())
+  }
   fn wheel(&self, delta_x: f32, delta_y: f32) -> Result<(), PlatformError> {
     let mut inputs = Vec::with_capacity(2);
     let dx_int = delta_x.round() as i32;
@@ -243,6 +266,14 @@ impl InputInjectorGeneral for WindowsInputInjector {
         let y = parts[2].parse::<f32>().map_err(|_e| PlatformError::TypeError)?;
         let bp = _stat.screen.get_base_point();
         self.moveabsolute(x, y, bp)
+      }
+      "MOUSE_MOVE_RELATIVE" => {
+        if parts.len() != 3 {
+          return Err(PlatformError::TypeError);
+        }
+        let dx = parts[1].parse::<f32>().map_err(|_e| PlatformError::TypeError)?.round() as i32;
+        let dy = parts[2].parse::<f32>().map_err(|_e| PlatformError::TypeError)?.round() as i32;
+        self.moverelative(dx, dy)
       }
       "MOUSE_WHEEL" => {
         if parts.len() != 3 {

@@ -30,6 +30,7 @@ pub trait MouseInjector {
   fn clickup(&self, button: u32) -> Result<(), PlatformError>;
   fn clickdown(&self, button: u32) -> Result<(), PlatformError>;
   fn moveabsolute(&self, x: f32, y: f32, bp: (i32, i32, i32, i32)) -> Result<(), PlatformError>;
+  fn moverelative(&self, dx: i32, dy: i32) -> Result<(), PlatformError>;
   fn wheel(&self, delta_x: f32, delta_y: f32) -> Result<(), PlatformError>;
 }
 pub trait KeyboardBackend {
