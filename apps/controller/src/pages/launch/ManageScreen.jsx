@@ -16,7 +16,12 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
     const [gameMode, setGameMode] = useState(false);
 
     useEffect(() => {
-        setGameMode(getSettings().gameMode);
+        const updateSettings = () => {
+            setGameMode(getSettings().gameMode);
+        };
+        updateSettings(); // Initial load
+        window.addEventListener("storage", updateSettings);
+        return () => window.removeEventListener("storage", updateSettings);
     }, []);
 
     useEffect(() => {
