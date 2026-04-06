@@ -256,7 +256,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     onMouseMove={handleMouseMove}
                     onContextMenu={(e) => e.preventDefault()}
                     onClick={() => {
-                        if (gameMode && !isOnLock && !isGameModePausedRef.current && canvasRef.current) {
+                        if (gameMode && !isOnLock && canvasRef.current) {
                             canvasRef.current.requestPointerLock();
                         }
                     }}
