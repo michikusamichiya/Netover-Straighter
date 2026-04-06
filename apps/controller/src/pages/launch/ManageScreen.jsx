@@ -164,8 +164,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
     };
 
     return (
-        <div className="flex flex-col h-screen bg-black"
-        >
+        <div className="fixed inset-0 z-50 flex flex-col bg-black">
             <header className="flex justify-left items-center p-2 bg-gray-900 border-b border-gray-800">
                 <button className="px-4 py-2 bg-netover_text text-netover_bg mr-2 rounded" onClick={() => {
                     launchService?.reset();
@@ -204,6 +203,12 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     ref={canvasRef}
                     className="max-w-full max-h-full object-contain"
                     onMouseMove={handleMouseMove}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onClick={() => {
+                        if (gameMode && !isOnLock && canvasRef.current) {
+                            canvasRef.current.requestPointerLock();
+                        }
+                    }}
                 />
 
                 {isOnLock && (
