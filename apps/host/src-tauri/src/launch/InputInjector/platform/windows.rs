@@ -111,7 +111,7 @@ impl MouseInjector for WindowsInputInjector {
   fn wheel(&self, delta_x: f32, delta_y: f32) -> Result<(), PlatformError> {
     let mut inputs = Vec::with_capacity(2);
     let dx_int = delta_x.round() as i32;
-    let dy_int = delta_y.round() as i32;
+    let dy_int = -delta_y.round() as i32;
 
     if dy_int != 0 {
       inputs.push(INPUT {

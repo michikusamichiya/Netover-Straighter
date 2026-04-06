@@ -109,8 +109,8 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                 return;
             }
             
-            const leaveCode = settingsRef.current?.key?.gamemode?.leave?.code || "F2";
-            const enterCode = settingsRef.current?.key?.gamemode?.enter?.code || "F8";
+            const leaveCode = settingsRef.current?.gamemode?.key?.leave?.code || "F2";
+            const enterCode = settingsRef.current?.gamemode?.key?.enter?.code || "F8";
 
             if (e.code === leaveCode && gameMode) {
                 setIsGameModePaused(true);
@@ -167,10 +167,19 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             if (isOnLock) return;
             if (e.target !== canvasRef.current && document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
+            // Normalize from Web/DOM standard (100 pixels per notch, positive Y = Scroll Down)
+            // to Windows OS standard (120 units per notch, negative Y = Scroll Down)
+            let outX = e.deltaX * 1.2;
+            let outY = -e.deltaY * 1.2;
             
-            const sensX = settingsRef.current.mouse?.wheel?.x ?? 1;
-            const sensY = settingsRef.current.mouse?.wheel?.y ?? 1;
-            launchService.sendData(`MOUSE_WHEEL ${e.deltaX * sensX} ${e.deltaY * sensY}`);
+            if (gameMode && !isGameModePausedRef.current) {
+                const sensX = settingsRef.current.gamemode?.mouse?.wheel?.x ?? 1;
+                const sensY = settingsRef.current.gamemode?.mouse?.wheel?.y ?? 1;
+                outX *= sensX;
+                outY *= sensY;
+            }
+            
+            launchService.sendData(`MOUSE_WHEEL ${outX} ${outY}`);
         }
 
         window.addEventListener("keydown", handleKeyDown);
@@ -207,8 +216,8 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             if (!gameMode || isGameModePausedRef.current) {
                 launchService.sendData(`MOUSE_MOVE ${x} ${y}`);
             } else {
-                const sensX = settingsRef.current.mouse?.sensitivity?.x ?? 1;
-                const sensY = settingsRef.current.mouse?.sensitivity?.y ?? 1;
+                const sensX = settingsRef.current.gamemode?.mouse?.sensitivity?.x ?? 1;
+                const sensY = settingsRef.current.gamemode?.mouse?.sensitivity?.y ?? 1;
                 launchService.sendData(`MOUSE_MOVE_RELATIVE ${e.movementX * sensX} ${e.movementY * sensY}`);
             }
         }

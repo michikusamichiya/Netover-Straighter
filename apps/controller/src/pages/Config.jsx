@@ -33,13 +33,13 @@ const CONFIG_FIELDS = [
         type: "checkbox"
       },
       {
-        id: "key.gamemode.leave.code",
+        id: "gamemode.key.leave.code",
         label: "Gamemode Leave Key (Code: e.g. F2)",
         type: "text",
         placeholder: "F2"
       },
       {
-        id: "key.gamemode.enter.code",
+        id: "gamemode.key.enter.code",
         label: "Gamemode Enter Key (Code: e.g. F8)",
         type: "text",
         placeholder: "F8"
@@ -48,32 +48,32 @@ const CONFIG_FIELDS = [
         label: "Settings in gameMode",
         children: [
           {
-            id: "mouse.sensitivity.x",
+            id: "gamemode.mouse.sensitivity.x",
             label: "Mouse Sensitivity X",
             type: "number"
           },
           {
-            id: "mouse.sensitivity.y",
+            id: "gamemode.mouse.sensitivity.y",
             label: "Mouse Sensitivity Y",
             type: "number"
           },
           {
-            id: "mouse.wheel.x",
+            id: "gamemode.mouse.wheel.x",
             label: "Mouse Sensitivity Wheel X",
             type: "number"
           },
           {
-            id: "mouse.wheel.y",
+            id: "gamemode.mouse.wheel.y",
             label: "Mouse Sensitivity Wheel Y",
             type: "number"
           },
           {
-            id: "key.gamemode.leave.code",
+            id: "gamemode.key.leave.code",
             label: "Key to leave from game mode temporarily",
             type: "text"
           },
           {
-            id: "key.gamemode.enter.code",
+            id: "gamemode.key.enter.code",
             label: "Key to enter game mode (when leaving temporarily)",
             type: "text"
           }
