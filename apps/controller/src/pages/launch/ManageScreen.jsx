@@ -14,10 +14,18 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
     const mouseFPS = 30;
 
     const [gameMode, setGameMode] = useState(false);
+    const [isGameModePaused, setIsGameModePaused] = useState(false);
+    const isGameModePausedRef = useRef(false);
+    
+    const [settings, setSettings] = useState({});
+    const settingsRef = useRef({});
 
     useEffect(() => {
         const updateSettings = () => {
-            setGameMode(getSettings().gameMode);
+            const newSettings = getSettings();
+            setSettings(newSettings);
+            settingsRef.current = newSettings;
+            setGameMode(newSettings.gameMode);
         };
         updateSettings(); // Initial load
         window.addEventListener("storage", updateSettings);
@@ -30,6 +38,10 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             document.exitPointerLock();
         }
     }, [isOnLock]);
+
+    useEffect(() => {
+        isGameModePausedRef.current = isGameModePaused;
+    }, [isGameModePaused]);
 
     useEffect(() => {
         if (!launchService || !videoHiddenRef.current) return;
@@ -96,6 +108,22 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                 setIsOnLock(!isOnLockRef.current);
                 return;
             }
+            
+            const leaveCode = settingsRef.current?.key?.gamemode?.leave?.code || "F2";
+            const enterCode = settingsRef.current?.key?.gamemode?.enter?.code || "F8";
+
+            if (e.code === leaveCode && gameMode) {
+                setIsGameModePaused(true);
+                if (document.pointerLockElement) {
+                    document.exitPointerLock();
+                }
+            } else if (e.code === enterCode && gameMode) {
+                setIsGameModePaused(false);
+                if (!isOnLockRef.current && canvasRef.current) {
+                    canvasRef.current.requestPointerLock();
+                }
+            }
+
             if (isOnLock) return;
             e.preventDefault();
             // if (e.repeat) return;
@@ -139,8 +167,10 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             if (isOnLock) return;
             if (e.target !== canvasRef.current && document.pointerLockElement !== canvasRef.current) return;
             e.preventDefault();
-            // console.log(e.deltaY);
-            launchService.sendData(`MOUSE_WHEEL ${e.deltaX} ${e.deltaY}`);
+            
+            const sensX = settingsRef.current.mouse?.wheel?.x ?? 1;
+            const sensY = settingsRef.current.mouse?.wheel?.y ?? 1;
+            launchService.sendData(`MOUSE_WHEEL ${e.deltaX * sensX} ${e.deltaY * sensY}`);
         }
 
         window.addEventListener("keydown", handleKeyDown);
@@ -174,14 +204,18 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             x = Math.max(0, Math.min(1, x));
             y = Math.max(0, Math.min(1, y));
 
-            if (!gameMode) launchService.sendData(`MOUSE_MOVE ${x} ${y}`);
-            else launchService.sendData(`MOUSE_MOVE_RELATIVE ${e.movementX} ${e.movementY}`);
+            if (!gameMode || isGameModePausedRef.current) {
+                launchService.sendData(`MOUSE_MOVE ${x} ${y}`);
+            } else {
+                const sensX = settingsRef.current.mouse?.sensitivity?.x ?? 1;
+                const sensY = settingsRef.current.mouse?.sensitivity?.y ?? 1;
+                launchService.sendData(`MOUSE_MOVE_RELATIVE ${e.movementX * sensX} ${e.movementY * sensY}`);
+            }
         }
     };
 
     return (
-        <div className="flex flex-col h-screen bg-black"
-        >
+        <div className="fixed inset-0 z-50 flex flex-col bg-black">
             <header className="flex justify-left items-center p-2 bg-gray-900 border-b border-gray-800">
                 <button className="px-4 py-2 bg-netover_text text-netover_bg mr-2 rounded" onClick={() => {
                     launchService?.reset();
@@ -220,8 +254,9 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     ref={canvasRef}
                     className="max-w-full max-h-full object-contain"
                     onMouseMove={handleMouseMove}
+                    onContextMenu={(e) => e.preventDefault()}
                     onClick={() => {
-                        if (gameMode && !isOnLock && canvasRef.current) {
+                        if (gameMode && !isOnLock && !isGameModePausedRef.current && canvasRef.current) {
                             canvasRef.current.requestPointerLock();
                         }
                     }}
