@@ -1,6 +1,12 @@
 export const DEFAULT_SETTINGS = {
   serverUrl: import.meta.env.VITE_WEBSOCKET_SERVER || "ws://localhost:3001",
-  gameMode: false
+  gameMode: false,
+  key: {
+    gamemode: {
+      leave: { code: "F2" },
+      enter: { code: "F8" }
+    }
+  }
 };
 
 export function getSettings() {

@@ -33,6 +33,18 @@ const CONFIG_FIELDS = [
         type: "checkbox"
       },
       {
+        id: "key.gamemode.leave.code",
+        label: "Gamemode Leave Key (Code: e.g. F2)",
+        type: "text",
+        placeholder: "F2"
+      },
+      {
+        id: "key.gamemode.enter.code",
+        label: "Gamemode Enter Key (Code: e.g. F8)",
+        type: "text",
+        placeholder: "F8"
+      },
+      {
         label: "Settings in gameMode",
         children: [
           {
