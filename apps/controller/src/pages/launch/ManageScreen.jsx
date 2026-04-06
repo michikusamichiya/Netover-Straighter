@@ -124,8 +124,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             e.preventDefault();
             // console.log(e.code);
             if (isOnLockRef.current) return;
-            const at = ["LEFT", "MIDDLE", "RIGHT"];
-            launchService.sendData(`${at[e.button]}_MOUSE_CLICK_UP`);
+            launchService.sendData(`MOUSE_CLICK_UP ${e.button}`);
         };
 
         const handleMouseDown = (e) => {
@@ -134,9 +133,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
             e.preventDefault();
             // console.log(e.code);
             if (isOnLockRef.current) return;
-            const at = ["LEFT", "MIDDLE", "RIGHT"];
-            console.log(`${at[e.button]}_MOUSE_DOWN`);
-            launchService.sendData(`${at[e.button]}_MOUSE_CLICK_DOWN`);
+            launchService.sendData(`MOUSE_CLICK_DOWN ${e.button}`);
         };
         const handleWheel = (e) => {
             if (isOnLock) return;
