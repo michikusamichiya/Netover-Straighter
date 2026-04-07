@@ -6,6 +6,8 @@ pub enum PlatformError {
   TypeError,
   PrepareError,
   ExistError,
+  DeviceNotFound,    // デバイスが見つからない
+  EncoderError,      // エンコード失敗
 }
 #[derive(Clone)]
 pub struct Screen {
@@ -55,6 +57,53 @@ pub trait CaptureLoop: Send {
     &mut self,
     target: &NativeScreen,
     encoder: Box<dyn VideoEncoder>,
+    on_frame: Box<dyn Fn(Vec<u8>) + Send>,
+  ) -> Result<(), PlatformError>;
+  fn stop(&mut self);
+}
+
+// PCM音声の1チャンク
+pub struct AudioFrame {
+  pub samples: Vec<f32>,
+  pub sample_rate: u32,
+  pub channels: u16,
+}
+
+// キャプチャ対象の抽象
+#[derive(Clone)]
+pub struct AudioDevice {
+  pub id: String,
+  pub name: String,
+  pub is_loopback: bool,
+}
+
+// プラットフォーム固有のオーディオデバイス
+#[derive(Clone)]
+pub enum NativeAudioDevice {
+  Windows { device_id: String },
+  Mac { uid: String },
+  Linux { alsa_name: String },
+}
+
+// ----- トレイト -----
+/// デバイス一覧取得（CaptureWayGeneralの音声版）
+pub trait AudioDeviceEnumerator: Send + Sync {
+  fn get_devices(&self) -> Result<Vec<(AudioDevice, NativeAudioDevice)>, PlatformError>;
+  fn get_default_input(&self) -> Result<(AudioDevice, NativeAudioDevice), PlatformError>;
+  fn get_loopback_device(&self) -> Result<(AudioDevice, NativeAudioDevice), PlatformError>;
+}
+
+/// Opusエンコーダ等（VideoEncoderの音声版）
+pub trait AudioEncoder: Send {
+  fn encode(&mut self, frame: &AudioFrame) -> Result<Vec<u8>, PlatformError>;
+}
+
+/// キャプチャループ（CaptureLoopの音声版）
+pub trait AudioCaptureLoop: Send {
+  fn start(
+    &mut self,
+    target: &NativeAudioDevice,
+    encoder: Box<dyn AudioEncoder>,
     on_frame: Box<dyn Fn(Vec<u8>) + Send>,
   ) -> Result<(), PlatformError>;
   fn stop(&mut self);

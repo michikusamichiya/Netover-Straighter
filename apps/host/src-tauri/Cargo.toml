@@ -49,10 +49,15 @@ windows = { version = "0.52", features = [
     "Win32_Graphics_Direct3D11",
     "Win32_Graphics_Direct3D",
     "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant"
 ] }
 async-trait = "0.1"
 openh264 = "0.9.3"
 rayon = "1"
+audiopus = "0.2"
 
 [profile.dev]
 opt-level = 3

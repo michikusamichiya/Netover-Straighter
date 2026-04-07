@@ -40,6 +40,10 @@ use webrtc::api::media_engine::MediaEngine;
 use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecParameters, RTPCodecType};
 use webrtc::interceptor::registry::Registry;
 use webrtc::api::interceptor_registry::register_default_interceptors;
+use crate::launch::ScreenOutputer::types::AudioCaptureLoop;
+use crate::launch::ScreenOutputer::AudioCapture::platform::windows::WindowsAudioCaptureLoop;
+use crate::launch::ScreenOutputer::AudioEncoder::encoders::opus::{self, OpusAudioEncoder};
+use crate::launch::ScreenOutputer::types::NativeAudioDevice;
 
 type HmacSha256 = Hmac<Sha256>;
  
@@ -70,7 +74,7 @@ pub struct LaunchingSession {
     pub pending_ice: Vec<serde_json::Value>,
     pub pending_answer: Option<RTCSessionDescription>,
     pub capture_loop: Option<Box<dyn CaptureLoop>>,
-
+    pub audio_capture_loop: Option<Box<dyn AudioCaptureLoop>>,
 }
 pub struct RTCSession {
     pc: Arc<RTCPeerConnection>,
@@ -251,6 +255,21 @@ async fn create_peer_connection_and_send_offer(
         RTPCodecType::Video,
     ).map_err(|e| format!("Failed to register codec: {}", e))?;
 
+    media_engine.register_codec(
+        RTCRtpCodecParameters {
+            capability: RTCRtpCodecCapability {
+                mime_type: "audio/opus".to_string(),
+                clock_rate: 48000,
+                channels: 2,
+                sdp_fmtp_line: "minptime=10;useinbandfec=1".to_string(),
+                ..Default::default()
+            },
+            payload_type: 111,
+            ..Default::default()
+        },
+        RTPCodecType::Audio,
+    ).map_err(|e| format!("Failed to register codec: {}", e))?;
+
     let mut registry = Registry::new();
     registry = register_default_interceptors(registry, &mut media_engine)
         .map_err(|e| format!("Failed to register interceptors: {}", e))?;
@@ -312,6 +331,15 @@ async fn create_peer_connection_and_send_offer(
         "track1".to_string(),
     ));
 
+    let audio_track = Arc::new(TrackLocalStaticSample::new(
+        RTCRtpCodecCapability {
+            mime_type: "audio/opus".to_string(),
+            ..Default::default()
+        },
+        "audio".to_string(),
+        "audio-track".to_string(),
+    ));
+
     let dc = peer_connection.create_data_channel("operation", None).await
         .map_err(|e| format!("Failed to create data channel: {}", e))?;
         
@@ -336,11 +364,13 @@ async fn create_peer_connection_and_send_offer(
     let launching_for_open = launching.clone();
     let app_for_open = app.clone();
     let track_for_open = track.clone();
+    let audio_track_for_open = audio_track.clone();
     let handle = tokio::runtime::Handle::current();
     dc.on_open(Box::new(move || {
         let launching = launching_for_open.clone();
         let app = app_for_open.clone();
         let track = track_for_open.clone();
+        let audio_track = audio_track_for_open.clone();
         let handle = handle.clone();
         println!("Data channel opened");
         Box::pin(async move {
@@ -358,6 +388,7 @@ async fn create_peer_connection_and_send_offer(
             
             tauri::async_runtime::spawn(async move {
                 let mut cl_box: Option<Box<dyn CaptureLoop>> = None;
+                let mut audio_cl_box: Option<Box<dyn AudioCaptureLoop>> = None;
                 if let Some(native_screen) = native_screen_opt {
                     if let Ok(encoder) = create_encoder() {
                         let track_for_capture = track.clone();
@@ -391,6 +422,27 @@ async fn create_peer_connection_and_send_offer(
                         if capture_loop.start(&native_screen, encoder, on_frame).is_ok() {
                             cl_box = Some(Box::new(capture_loop));
                         }
+                    }
+                }
+
+                if let Ok(opus) = OpusAudioEncoder::new() {
+                    let (atx, mut arx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+                    tokio::spawn(async move {
+                        let duration = std::time::Duration::from_millis(20);
+                        while let Some(encoded) = arx.recv().await {
+                            let sample = webrtc::media::Sample {
+                                data: Bytes::from(encoded),
+                                duration,
+                                ..Default::default()
+                            };
+                            let _ = audio_track.write_sample(&sample).await;
+                        }
+                    });
+                    let on_audio: Box<dyn Fn(Vec<u8>) + Send> = Box::new(move |e| { let _ = atx.send(e); });
+                    let mut acl = WindowsAudioCaptureLoop::new();
+                    let loopback = NativeAudioDevice::Windows { device_id: "loopback".to_string() };
+                    if acl.start(&loopback, Box::new(opus), on_audio).is_ok() {
+                        audio_cl_box = Some(Box::new(acl));
                     }
                 }
 
@@ -435,6 +487,14 @@ async fn create_peer_connection_and_send_offer(
     tokio::spawn(async move {
         let mut rtcp_buf = vec![0u8; 1500];
         while let Ok((_, _)) = rtp_sender.read(&mut rtcp_buf).await {}
+    });
+
+    let audio_track_dyn = Arc::clone(&audio_track) as Arc<dyn webrtc::track::track_local::TrackLocal + Send + Sync>;
+    let rtp_sender_audio = peer_connection.add_track(audio_track_dyn).await
+        .map_err(|e| format!("Failed to add audio track: {}", e))?;
+    tokio::spawn(async move {
+        let mut rtcp_buf = vec![0u8; 1500];
+        while let Ok((_, _)) = rtp_sender_audio.read(&mut rtcp_buf).await {}
     });
 
     // キャプチャの起動は DataChannel が Open したタイミングに遅延させる
@@ -594,9 +654,8 @@ async fn end_launching_inner(launching: Arc<Mutex<Option<LaunchingSession>>>) ->
         let mut guard = launching.lock().await;
         // capture_loopも止める
         if let Some(session) = guard.as_mut() {
-            if let Some(cl) = session.capture_loop.as_mut() {
-                cl.stop();
-            }
+            if let Some(cl) = session.capture_loop.as_mut() { cl.stop(); }
+            if let Some(acl) = session.audio_capture_loop.as_mut() { acl.stop(); }
         }
         let ws = guard.as_mut().and_then(|s| s.ws.take());
         let rtc = guard.as_mut().and_then(|s| s.rtc.take());
@@ -709,10 +768,10 @@ pub async fn launch(app: AppHandle, state: State<'_, AppState>) -> Result<(), St
                             // 再度接続を受け付けられる Pending 状態に戻す
                             let mut guard = state.lock().await;
                             if let Some(session) = guard.as_mut() {
-                                if let Some(cl) = session.capture_loop.as_mut() {
-                                    cl.stop();
-                                }
+                                if let Some(cl) = session.capture_loop.as_mut() { cl.stop(); }
+                                if let Some(acl) = session.audio_capture_loop.as_mut() { acl.stop(); }
                                 session.capture_loop = None;
+                                session.audio_capture_loop = None;
                                 session.rtc = None;
                                 session.pending_ice.clear();
                                 session.pending_answer = None;
@@ -828,6 +887,7 @@ pub async fn launch(app: AppHandle, state: State<'_, AppState>) -> Result<(), St
         pending_ice: Vec::new(),
         pending_answer: None,
         capture_loop: None,
+        audio_capture_loop: None,
     });
  
     emit_safer(&app, "launching_connected", "", |e| reporter!(e));
