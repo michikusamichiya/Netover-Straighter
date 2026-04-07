@@ -77,72 +77,88 @@ fn audio_capture_loop_inner(
         .map_err(|e| PlatformError::APIError(e.code().0))?;
 
     let (audio_client, is_loopback) = create_audio_client(device_id)?;
-    let capture_client = initialize_audio_client(&audio_client, is_loopback)?;
+    let (capture_client, native_channels) = initialize_audio_client(&audio_client, is_loopback)?;
+    let native_channels = native_channels as usize;
 
     // ③ キャプチャ開始
     unsafe { audio_client.Start() }
         .map_err(|e| PlatformError::APIError(e.code().0))?;
 
+    // Opus は 2ch ステレオ、48000Hz、960フレーム(=20ms) を期待する
+    // 1フレーム = 960 サンプル × 2ch = 1920 要素
+    const OPUS_FRAME_SAMPLES: usize = 960;
+    const OPUS_CHANNELS: usize = 2;
+    const OPUS_FRAME_SIZE: usize = OPUS_FRAME_SAMPLES * OPUS_CHANNELS;
+
+    // ステレオダウンミックス済みサンプルのバッファ
+    let mut sample_buf: Vec<f32> = Vec::with_capacity(OPUS_FRAME_SIZE * 4);
+
     while running.load(Ordering::SeqCst) {
-        // ④ バッファにデータが来るまで待つ
-        // VideoのAcquireNextFrame(33ms)に相当するポーリング
         let packet_size = unsafe { capture_client.GetNextPacketSize() }
             .map_err(|e| PlatformError::APIError(e.code().0))?;
 
         if packet_size == 0 {
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(std::time::Duration::from_millis(5));
             continue;
         }
 
-        // ⑤ バッファ取得
         let mut data_ptr: *mut u8 = std::ptr::null_mut();
         let mut num_frames = 0u32;
         let mut flags = 0u32;
         unsafe {
-            capture_client.GetBuffer(
-                &mut data_ptr,
-                &mut num_frames,
-                &mut flags,
-                None,
-                None,
-            )
+            capture_client.GetBuffer(&mut data_ptr, &mut num_frames, &mut flags, None, None)
         }.map_err(|e| PlatformError::APIError(e.code().0))?;
 
-        // ⑥ AUDCLNT_BUFFERFLAGS_SILENT は無音フレーム（スキップ可）
-        let encoded = if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
-            // 無音フレームはゼロPCMとして扱う
-            let silent_frame = AudioFrame {
-                samples: vec![0.0f32; num_frames as usize * 2], // stereo想定
-                sample_rate: 48000,
-                channels: 2,
-            };
-            encoder.encode(&silent_frame)?
-        } else {
-            // ⑦ *mut u8 → &[f32] に変換
-            // WASAPIはIEEE_FLOAT形式で初期化しているのでf32直読みできる
-            let samples = unsafe {
-                std::slice::from_raw_parts(
-                    data_ptr as *const f32,
-                    num_frames as usize * 2, // stereo: channels=2
-                ).to_vec()
-            };
+        let num_frames_usize = num_frames as usize;
 
-            // ⑧ VideoのReleaseFrame()に相当 → 必ずGetBufferの直後に呼ぶ
-            unsafe { capture_client.ReleaseBuffer(num_frames) }
-                .map_err(|e| PlatformError::APIError(e.code().0))?;
-
-            let frame = AudioFrame { samples, sample_rate: 48000, channels: 2 };
-            encoder.encode(&frame)?
-        };
-
-        // silentの場合はReleaseBufferをここで呼ぶ
-        // （上のelse分岐では先に呼んでいるため条件分岐が必要）
+        // サンプルを読み取り、ステレオにダウンミックスしてバッファに積む
         if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
-            unsafe { capture_client.ReleaseBuffer(num_frames) }
-                .map_err(|e| PlatformError::APIError(e.code().0))?;
-        }
+            // サイレントフレーム: ステレオ無音を追加
+            sample_buf.extend(vec![0.0f32; num_frames_usize * OPUS_CHANNELS]);
+        } else {
+            // 実際のチャンネル数(native_channels)でスライスを作成
+            let total_samples = num_frames_usize * native_channels;
+            let raw = unsafe {
+                std::slice::from_raw_parts(data_ptr as *const f32, total_samples)
+            };
 
-        on_frame(encoded);
+            // チャンネルダウンミックス: 全チャンネルの平均 → L/R に分配
+            // native_channels == 2 の場合はそのまま通す
+            for frame_i in 0..num_frames_usize {
+                let offset = frame_i * native_channels;
+                let frame_samples = &raw[offset..offset + native_channels];
+
+                if native_channels == 1 {
+                    // モノラル → ステレオ
+                    let s = frame_samples[0];
+                    sample_buf.push(s);
+                    sample_buf.push(s);
+                } else if native_channels == 2 {
+                    // ステレオそのまま
+                    sample_buf.push(frame_samples[0]);
+                    sample_buf.push(frame_samples[1]);
+                } else {
+                    // マルチチャンネル → ステレオダウンミックス
+                    // L: 偶数インデックスの平均、R: 奇数インデックスの平均
+                    let half = native_channels / 2;
+                    let l: f32 = frame_samples[..half].iter().sum::<f32>() / half as f32;
+                    let r: f32 = frame_samples[half..].iter().sum::<f32>() / (native_channels - half) as f32;
+                    sample_buf.push(l);
+                    sample_buf.push(r);
+                }
+            }
+        }
+        unsafe { capture_client.ReleaseBuffer(num_frames) }
+            .map_err(|e| PlatformError::APIError(e.code().0))?;
+
+        // 960サンプル×2ch (1920要素) 溜まったらエンコード
+        while sample_buf.len() >= OPUS_FRAME_SIZE {
+            let chunk: Vec<f32> = sample_buf.drain(..OPUS_FRAME_SIZE).collect();
+            let frame = AudioFrame { samples: chunk, sample_rate: 48000, channels: 2 };
+            if let Ok(encoded) = encoder.encode(&frame) {
+                on_frame(encoded);
+            }
+        }
     }
 
     unsafe { audio_client.Stop() }
@@ -186,44 +202,51 @@ fn create_audio_client(device_id: &str) -> Result<(IAudioClient, bool), Platform
     Ok((audio_client, is_loopback))
 }
 
-/// IAudioClientを初期化してIAudioCaptureClientを返す
+/// IAudioClientを初期化してIAudioCaptureClientと実際のチャンネル数を返す
 fn initialize_audio_client(
     audio_client: &IAudioClient,
     is_loopback: bool,
-) -> Result<IAudioCaptureClient, PlatformError> {
-    // ② フォーマット指定: 48kHz, 2ch, IEEE_FLOAT 32bit
-    // これでGetBuffer後にf32直読みできる（VideoのBGRAに相当）
-    let format = WAVEFORMATEX {
-        wFormatTag: 3 as u16, // WAVE_FORMAT_IEEE_FLOAT
-        nChannels: 2,
-        nSamplesPerSec: 48000,
-        nAvgBytesPerSec: 48000 * 2 * 4, // sampleRate * channels * bytesPerSample
-        nBlockAlign: 2 * 4,             // channels * bytesPerSample
-        wBitsPerSample: 32,
-        cbSize: 0,
+) -> Result<(IAudioCaptureClient, u16), PlatformError> {
+    // デバイスのネイティブミックスフォーマットを取得してそのまま使う
+    // （SHARED モードでは GetMixFormat() が返すフォーマット以外は通常使えない）
+    let mix_format = unsafe { audio_client.GetMixFormat() }
+        .map_err(|e| PlatformError::APIError(e.code().0))?;
+
+    let (native_channels, sample_rate, bits) = unsafe {
+        let channels = (*mix_format).nChannels;
+        let sr = (*mix_format).nSamplesPerSec;
+        let bits = (*mix_format).wBitsPerSample;
+        (channels, sr, bits)
     };
+
+    log::info!(
+        "Audio format: {}Hz, {}ch, {}bit",
+        sample_rate,
+        native_channels,
+        bits,
+    );
 
     let stream_flags: u32 = if is_loopback {
         AUDCLNT_STREAMFLAGS_LOOPBACK
     } else {
         0
     };
+
     unsafe {
         audio_client.Initialize(
             AUDCLNT_SHAREMODE_SHARED,
-            stream_flags, // u32をそのまま渡す
+            stream_flags,
             1_000_000,
             0,
-            &format,
+            mix_format,
             None,
         )
     }.map_err(|e| PlatformError::APIError(e.code().0))?;
 
     // IAudioCaptureClient取得
-    // VideoでIDXGIOutputDuplicationを取得するのに相当するステップ
     let capture_client: IAudioCaptureClient = unsafe {
         audio_client.GetService()
     }.map_err(|e| PlatformError::APIError(e.code().0))?;
 
-    Ok(capture_client)
+    Ok((capture_client, native_channels))
 }
