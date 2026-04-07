@@ -77,20 +77,19 @@ fn audio_capture_loop_inner(
         .map_err(|e| PlatformError::APIError(e.code().0))?;
 
     let (audio_client, is_loopback) = create_audio_client(device_id)?;
-    let (capture_client, native_channels) = initialize_audio_client(&audio_client, is_loopback)?;
-    let native_channels = native_channels as usize;
+    // Windows がリサンプリング＆ダウンミックスを行うため、
+    // キャプチャは常に 48000Hz / 2ch / f32 で返ってくる
+    let capture_client = initialize_audio_client(&audio_client, is_loopback)?;
 
     // ③ キャプチャ開始
     unsafe { audio_client.Start() }
         .map_err(|e| PlatformError::APIError(e.code().0))?;
 
-    // Opus は 2ch ステレオ、48000Hz、960フレーム(=20ms) を期待する
-    // 1フレーム = 960 サンプル × 2ch = 1920 要素
+    // Opus: 2ch ステレオ、48000Hz、960サンプル(=20ms) = 1920 要素/フレーム
     const OPUS_FRAME_SAMPLES: usize = 960;
     const OPUS_CHANNELS: usize = 2;
     const OPUS_FRAME_SIZE: usize = OPUS_FRAME_SAMPLES * OPUS_CHANNELS;
 
-    // ステレオダウンミックス済みサンプルのバッファ
     let mut sample_buf: Vec<f32> = Vec::with_capacity(OPUS_FRAME_SIZE * 4);
 
     while running.load(Ordering::SeqCst) {
@@ -111,42 +110,15 @@ fn audio_capture_loop_inner(
 
         let num_frames_usize = num_frames as usize;
 
-        // サンプルを読み取り、ステレオにダウンミックスしてバッファに積む
+        // AUTOCONVERTPCM により Windows 側で 48000Hz/2ch/f32 に変換済み
+        // → 2ch 固定で直接読み取るだけでよい
         if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
-            // サイレントフレーム: ステレオ無音を追加
             sample_buf.extend(vec![0.0f32; num_frames_usize * OPUS_CHANNELS]);
         } else {
-            // 実際のチャンネル数(native_channels)でスライスを作成
-            let total_samples = num_frames_usize * native_channels;
-            let raw = unsafe {
-                std::slice::from_raw_parts(data_ptr as *const f32, total_samples)
+            let samples = unsafe {
+                std::slice::from_raw_parts(data_ptr as *const f32, num_frames_usize * OPUS_CHANNELS)
             };
-
-            // チャンネルダウンミックス: 全チャンネルの平均 → L/R に分配
-            // native_channels == 2 の場合はそのまま通す
-            for frame_i in 0..num_frames_usize {
-                let offset = frame_i * native_channels;
-                let frame_samples = &raw[offset..offset + native_channels];
-
-                if native_channels == 1 {
-                    // モノラル → ステレオ
-                    let s = frame_samples[0];
-                    sample_buf.push(s);
-                    sample_buf.push(s);
-                } else if native_channels == 2 {
-                    // ステレオそのまま
-                    sample_buf.push(frame_samples[0]);
-                    sample_buf.push(frame_samples[1]);
-                } else {
-                    // マルチチャンネル → ステレオダウンミックス
-                    // L: 偶数インデックスの平均、R: 奇数インデックスの平均
-                    let half = native_channels / 2;
-                    let l: f32 = frame_samples[..half].iter().sum::<f32>() / half as f32;
-                    let r: f32 = frame_samples[half..].iter().sum::<f32>() / (native_channels - half) as f32;
-                    sample_buf.push(l);
-                    sample_buf.push(r);
-                }
-            }
+            sample_buf.extend_from_slice(samples);
         }
         unsafe { capture_client.ReleaseBuffer(num_frames) }
             .map_err(|e| PlatformError::APIError(e.code().0))?;
@@ -202,35 +174,44 @@ fn create_audio_client(device_id: &str) -> Result<(IAudioClient, bool), Platform
     Ok((audio_client, is_loopback))
 }
 
-/// IAudioClientを初期化してIAudioCaptureClientと実際のチャンネル数を返す
+/// IAudioClientを初期化してIAudioCaptureClientを返す
+/// AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM + SRC_QUALITY により
+/// Windows が自動でリサンプリング＆ダウンミックスを行う。
+/// 呼び出し後は常に 48000Hz / 2ch / IEEE_FLOAT 32bit でデータが返る。
 fn initialize_audio_client(
     audio_client: &IAudioClient,
     is_loopback: bool,
-) -> Result<(IAudioCaptureClient, u16), PlatformError> {
-    // デバイスのネイティブミックスフォーマットを取得してそのまま使う
-    // （SHARED モードでは GetMixFormat() が返すフォーマット以外は通常使えない）
+) -> Result<IAudioCaptureClient, PlatformError> {
+    // デバイスのネイティブフォーマットをログだけのために読む
     let mix_format = unsafe { audio_client.GetMixFormat() }
         .map_err(|e| PlatformError::APIError(e.code().0))?;
+    unsafe {
+        let sr   = std::ptr::read_unaligned(std::ptr::addr_of!((*mix_format).nSamplesPerSec));
+        let ch   = std::ptr::read_unaligned(std::ptr::addr_of!((*mix_format).nChannels));
+        let bits = std::ptr::read_unaligned(std::ptr::addr_of!((*mix_format).wBitsPerSample));
+        log::info!("Native audio format: {}Hz, {}ch, {}bit", sr, ch, bits);
+    }
 
-    let (native_channels, sample_rate, bits) = unsafe {
-        let channels = (*mix_format).nChannels;
-        let sr = (*mix_format).nSamplesPerSec;
-        let bits = (*mix_format).wBitsPerSample;
-        (channels, sr, bits)
+    // Opus に合わせた目標フォーマット: 48000Hz / 2ch / IEEE_FLOAT 32bit
+    let desired_format = WAVEFORMATEX {
+        wFormatTag: 3u16, // WAVE_FORMAT_IEEE_FLOAT
+        nChannels: 2,
+        nSamplesPerSec: 48000,
+        nAvgBytesPerSec: 48000 * 2 * 4,
+        nBlockAlign: 2 * 4,
+        wBitsPerSample: 32,
+        cbSize: 0,
     };
 
-    log::info!(
-        "Audio format: {}Hz, {}ch, {}bit",
-        sample_rate,
-        native_channels,
-        bits,
-    );
+    // AUTOCONVERTPCM: Windows Audio Engine がフォーマット変換を担当
+    // SRC_QUALITY:    高品質なリサンプラーを使用（44100→48000 等）
+    const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x80000000;
+    const AUDCLNT_STREAMFLAGS_SRC_QUALITY: u32    = 0x08000000;
 
-    let stream_flags: u32 = if is_loopback {
-        AUDCLNT_STREAMFLAGS_LOOPBACK
-    } else {
-        0
-    };
+    let mut stream_flags: u32 = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_QUALITY;
+    if is_loopback {
+        stream_flags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
+    }
 
     unsafe {
         audio_client.Initialize(
@@ -238,15 +219,16 @@ fn initialize_audio_client(
             stream_flags,
             1_000_000,
             0,
-            mix_format,
+            &desired_format as *const WAVEFORMATEX,
             None,
         )
     }.map_err(|e| PlatformError::APIError(e.code().0))?;
 
-    // IAudioCaptureClient取得
+    log::info!("Audio initialized: 48000Hz, 2ch, 32bit (AUTOCONVERTPCM)");
+
     let capture_client: IAudioCaptureClient = unsafe {
         audio_client.GetService()
     }.map_err(|e| PlatformError::APIError(e.code().0))?;
 
-    Ok((capture_client, native_channels))
+    Ok(capture_client)
 }
