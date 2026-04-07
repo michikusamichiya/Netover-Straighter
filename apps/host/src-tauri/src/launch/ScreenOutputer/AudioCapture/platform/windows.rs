@@ -2,7 +2,7 @@ use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::*;
 use windows::core::PCWSTR;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use crate::launch::ScreenOutputer::Capture::types::*;
+use crate::launch::ScreenOutputer::types::*;
 
 // ===========================
 // WindowsAudioCaptureLoop
@@ -86,12 +86,10 @@ fn audio_capture_loop_inner(
     while running.load(Ordering::SeqCst) {
         // ④ バッファにデータが来るまで待つ
         // VideoのAcquireNextFrame(33ms)に相当するポーリング
-        let mut packet_size = 0u32;
-        unsafe { capture_client.GetNextPacketSize(&mut packet_size) }
+        let packet_size = unsafe { capture_client.GetNextPacketSize() }
             .map_err(|e| PlatformError::APIError(e.code().0))?;
 
         if packet_size == 0 {
-            // データなし → スリープしてリトライ（VideoのDXGI_ERROR_WAIT_TIMEOUTと同じ扱い）
             std::thread::sleep(std::time::Duration::from_millis(10));
             continue;
         }
@@ -183,7 +181,7 @@ fn create_audio_client(device_id: &str) -> Result<(IAudioClient, bool), Platform
 
     let audio_client: IAudioClient = unsafe {
         mm_device.Activate(CLSCTX_ALL, None)
-    }.map_err(|e| PlatformError::APIError(e.code().0))?;
+    }.map_err(|e: windows::core::Error| PlatformError::APIError(e.code().0))?;
 
     Ok((audio_client, is_loopback))
 }
@@ -196,7 +194,7 @@ fn initialize_audio_client(
     // ② フォーマット指定: 48kHz, 2ch, IEEE_FLOAT 32bit
     // これでGetBuffer後にf32直読みできる（VideoのBGRAに相当）
     let format = WAVEFORMATEX {
-        wFormatTag: WAVE_FORMAT_IEEE_FLOAT as u16,
+        wFormatTag: 3 as u16, // WAVE_FORMAT_IEEE_FLOAT
         nChannels: 2,
         nSamplesPerSec: 48000,
         nAvgBytesPerSec: 48000 * 2 * 4, // sampleRate * channels * bytesPerSample
@@ -205,19 +203,15 @@ fn initialize_audio_client(
         cbSize: 0,
     };
 
-    let stream_flags = if is_loopback {
-        // loopbackはAUDCLNT_STREAMFLAGS_LOOPBACKが必須
+    let stream_flags: u32 = if is_loopback {
         AUDCLNT_STREAMFLAGS_LOOPBACK
     } else {
-        AUDCLNT_STREAMFLAGS(0)
+        0
     };
-
     unsafe {
         audio_client.Initialize(
-            AUDCLNT_SHAREMODE_SHARED, // 排他モードは不要、共有モードで十分
-            stream_flags.0,
-            // バッファ長: 100ms (単位は100ns)
-            // Videoの33ms(30fps)に相当するバッファサイズ感
+            AUDCLNT_SHAREMODE_SHARED,
+            stream_flags, // u32をそのまま渡す
             1_000_000,
             0,
             &format,

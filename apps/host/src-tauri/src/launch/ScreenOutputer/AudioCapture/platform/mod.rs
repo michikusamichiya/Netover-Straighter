@@ -1,13 +1,15 @@
-pub mod platform;
+#[cfg(target_os = "windows")]
+pub mod windows;
 
 use std::sync::Arc;
-use types::AudioCaptureLoop;
+use crate::launch::ScreenOutputer::types::AudioCaptureLoop;
 
-pub fn create_audio_capture_loop() -> Arc<dyn AudioCaptureLoop + Send + Sync> {
+pub fn create_audio_capture_loop() -> Box<dyn AudioCaptureLoop> {
     #[cfg(target_os = "windows")]
     {
         use crate::launch::ScreenOutputer::AudioCapture::platform::windows::WindowsAudioCaptureLoop;
-        return Arc::new(WindowsAudioCaptureLoop {});
+        let capture_loop: Box<dyn AudioCaptureLoop> = Box::new(WindowsAudioCaptureLoop::new());
+        return capture_loop;
     }
     #[cfg(target_os = "linux")]
     {
