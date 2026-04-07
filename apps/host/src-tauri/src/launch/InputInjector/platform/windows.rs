@@ -74,9 +74,9 @@ impl MouseInjector for WindowsInputInjector {
     Ok(())
   }
   fn moveabsolute(&self, x: f32, y: f32, bp: (i32, i32, i32, i32)) -> Result<(), PlatformError> {
-    // basepoint is (x, y, w, h)
-    let x = bp.0 + (x * bp.2 as f32) as i32;
-    let y = bp.1 + (y * bp.3 as f32) as i32;
+    // basepoint is (x_start, y_start, x_end, y_end)
+    let x = bp.0 + (x * (bp.2 - bp.0) as f32) as i32;
+    let y = bp.1 + (y * (bp.3 - bp.1) as f32) as i32;
     unsafe {
       let res = SetCursorPos(x, y);
       if res.is_err() {

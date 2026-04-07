@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use serde::Serialize;
 
 #[derive(Debug)]
 pub enum PlatformError {
@@ -9,7 +10,7 @@ pub enum PlatformError {
   DeviceNotFound,    // デバイスが見つからない
   EncoderError,      // エンコード失敗
 }
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Screen {
   pub id: String,
   pub name: String,
@@ -24,12 +25,13 @@ impl Screen {
     (self.x, self.y, self.x + self.width as i32, self.y + self.height as i32)
   }
 }
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub enum NativeScreen {
   Windows { adapter_idx: u32, output_idx: u32 },
   Mac { display_id: u32 },
   Linux { internal_id: String },
 }
+#[derive(Serialize)]
 pub struct ScreenManager {
   pub screens: Vec<Screen>,
   pub now_screen: Screen,

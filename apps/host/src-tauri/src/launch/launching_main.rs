@@ -79,6 +79,7 @@ pub struct LaunchingSession {
 pub struct RTCSession {
     pc: Arc<RTCPeerConnection>,
     dc: Option<Arc<RTCDataChannel>>,
+    info: Option<Arc<RTCDataChannel>>
 }
  
 #[derive(Deserialize, Clone)]
@@ -229,7 +230,7 @@ async fn create_peer_connection_and_send_offer(
     launching: &Arc<Mutex<Option<LaunchingSession>>>, 
     app: &AppHandle,
     config: RTCConfiguration
-) -> Result<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>), String> {
+) -> Result<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>, Arc<RTCDataChannel>), String> {
     let mut media_engine = MediaEngine::default();
     media_engine.register_codec(
         RTCRtpCodecParameters {
@@ -342,7 +343,32 @@ async fn create_peer_connection_and_send_offer(
 
     let dc = peer_connection.create_data_channel("operation", None).await
         .map_err(|e| format!("Failed to create data channel: {}", e))?;
+
+    let info = peer_connection.create_data_channel("info", None).await
+        .map_err(|e| format!("Failed to create data channel: {}", e))?;
         
+    let info_for_open = info.clone();
+    let app_for_info_open = app.clone();
+    info.on_open(Box::new(move || {
+        let info = info_for_open.clone();
+        let app = app_for_info_open.clone();
+        Box::pin(async move {
+            println!("Info channel opened");
+            let screen_manager_json = {
+                let app_state = app.state::<AppState>();
+                let capture_stat_guard = app_state.capture_stat.lock().await;
+                if let Some(mgr) = capture_stat_guard.as_ref() {
+                    serde_json::to_string(mgr).ok()
+                } else {
+                    None
+                }
+            };
+
+            if let Some(json) = screen_manager_json {
+                let _ = info.send_text(json).await;
+            }
+        })
+    }));
     let launching_for_dc_close = launching.clone();
     let app_for_dc_close = app.clone();
     dc.on_close(Box::new(move || {
@@ -360,6 +386,7 @@ async fn create_peer_connection_and_send_offer(
             }
         })
     }));
+
 
     let launching_for_open = launching.clone();
     let app_for_open = app.clone();
@@ -457,24 +484,94 @@ async fn create_peer_connection_and_send_offer(
         })
     }));
 
-    let app_handle = app.clone();
+    let app_for_msg = app.clone();
+    let track_for_msg = track.clone();
+    let launching_for_msg = launching.clone();
     dc.on_message(Box::new(move |msg| {
-        let app = app_handle.clone();
+        let app = app_for_msg.clone();
         let msg_str = String::from_utf8_lossy(&msg.data).to_string();
+        let track = track_for_msg.clone();
+        let launching = launching_for_msg.clone();
         Box::pin(async move {
-            tauri::async_runtime::spawn(async move {
-                let state = app.state::<AppState>();
-                let input_trait = state.input_trait.clone();
-                let input_stat_mutex = state.input_stat.clone();
-     
-                let stat_guard = input_stat_mutex.lock().await;
-                if let Some(stat) = stat_guard.as_ref() {
-                    let res = input_trait.handle_input(stat, msg_str).await;
-                    if let Err(err) = res {
-                        println!("Failed to handle input: {:?}", err);
+            if msg_str.starts_with("SWITCH_SCREEN ") {
+                let id = msg_str.trim_start_matches("SWITCH_SCREEN ").trim();
+                println!("Switching to screen: {}", id);
+                
+                let screen_info = {
+                    let state = app.state::<AppState>();
+                    let mut stat_guard = state.capture_stat.lock().await;
+                    if let Some(mgr) = stat_guard.as_mut() {
+                        if let Some(native) = mgr.native_map.get(id).cloned() {
+                            if let Some(screen) = mgr.screens.iter().find(|s| s.id == id).cloned() {
+                                mgr.now_screen = screen.clone();
+                                // InputStatも更新
+                                let mut input_stat_guard = state.input_stat.lock().await;
+                                if let Some(input_stat) = input_stat_guard.as_mut() {
+                                    input_stat.screen = screen.clone();
+                                }
+                                Some((screen, native))
+                            } else { None }
+                        } else { None }
+                    } else { None }
+                };
+
+                if let Some((_screen, native)) = screen_info {
+                    let mut guard = launching.lock().await;
+                    if let Some(session) = guard.as_mut() {
+                        // 既存のループを停止
+                        if let Some(cl) = session.capture_loop.as_mut() {
+                            cl.stop();
+                        }
+                        
+                        // 新しいキャプチャを開始
+                        if let Ok(encoder) = create_encoder() {
+                            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+                            let track_for_capture = track.clone();
+                            
+                            tokio::spawn(async move {
+                                let mut last_frame_time = std::time::Instant::now();
+                                while let Some(encoded) = rx.recv().await {
+                                    let now = std::time::Instant::now();
+                                    let mut duration = now.duration_since(last_frame_time);
+                                    last_frame_time = now;
+                                    if duration.as_millis() == 0 {
+                                        duration = std::time::Duration::from_millis(1);
+                                    }
+                                    let sample = webrtc::media::Sample {
+                                        data: Bytes::from(encoded),
+                                        duration,
+                                        ..Default::default()
+                                    };
+                                    let _ = track_for_capture.write_sample(&sample).await;
+                                }
+                            });
+
+                            let on_frame: Box<dyn Fn(Vec<u8>) + Send> = Box::new(move |encoded| {
+                                let _ = tx.send(encoded);
+                            });
+
+                            let mut capture_loop = WindowsCaptureLoop::new();
+                            if capture_loop.start(&native, encoder, on_frame).is_ok() {
+                                session.capture_loop = Some(Box::new(capture_loop));
+                            }
+                        }
                     }
                 }
-            });
+            } else {
+                tauri::async_runtime::spawn(async move {
+                    let state = app.state::<AppState>();
+                    let input_trait = state.input_trait.clone();
+                    let input_stat_mutex = state.input_stat.clone();
+         
+                    let stat_guard = input_stat_mutex.lock().await;
+                    if let Some(stat) = stat_guard.as_ref() {
+                        let res = input_trait.handle_input(stat, msg_str).await;
+                        if let Err(err) = res {
+                            println!("Failed to handle input: {:?}", err);
+                        }
+                    }
+                });
+            }
         })
     }));
 
@@ -516,7 +613,7 @@ async fn create_peer_connection_and_send_offer(
         }
     }
 
-    Ok((peer_connection, dc.clone()))
+    Ok((peer_connection, dc.clone(), info.clone()))
 }
  
 async fn handle_ice_candidate(
@@ -579,7 +676,7 @@ async fn handle_queryverify_and_send_offer(
     emit_safer(&app, "launching_queryverify", "", |e| reporter!(e));
  
     // ここから接続
-    let (peer_connection, data_channel) =
+    let (peer_connection, data_channel, info_channel) =
         create_peer_connection_and_send_offer(&launching, &app, config).await?;
  
     let pending_answer = {
@@ -592,6 +689,7 @@ async fn handle_queryverify_and_send_offer(
         session.rtc = Some(Arc::new(RTCSession {
             pc: peer_connection,
             dc: Some(data_channel),
+            info: Some(info_channel),
         }));
         session.pending_answer.take()
     };
@@ -667,6 +765,9 @@ async fn end_launching_inner(launching: Arc<Mutex<Option<LaunchingSession>>>) ->
     }
     
     if let Some(rtc) = rtc {
+        if let Some(info) = rtc.info.as_ref() {
+            let _ = info.close().await;
+        }
         let _ = rtc.pc.close().await;
     }
  

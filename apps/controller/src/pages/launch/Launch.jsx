@@ -12,6 +12,7 @@ export default function Launch() {
 
   const [isOnFocus, setIsOnFocus] = useState(false);
   const [isOnLock, setIsOnLock] = useState(false);
+  const [screens, setScreens] = useState([]);
 
   const fileInputRef = useRef(null);
   const launchServiceRef = useRef(null);
@@ -26,6 +27,18 @@ export default function Launch() {
       onUnactive: () => {
         setIsActive(false);
       },
+      onInfoMessage: (msg) => {
+        console.log("Received info message:", msg);
+        try {
+          const data = JSON.parse(msg);
+          console.log("Parsed info data:", data);
+          if (data.screens) {
+            setScreens(data.screens);
+          }
+        } catch (e) {
+          console.error("Failed to parse info message:", e);
+        }
+      }
     });
   }, []);
 
@@ -61,6 +74,7 @@ export default function Launch() {
         setIsOnFocus={setIsOnFocus}
         setIsOnLock={setIsOnLock}
         isOnLock={isOnLock}
+        screens={screens}
       />
     )
   } else {

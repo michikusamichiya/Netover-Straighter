@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { getSettings } from "@/scripts/settings";
-import { Loader, X, Cog, Terminal, Wallpaper } from "lucide-react";
+import { Loader, X, Cog, Terminal, Wallpaper, Monitor } from "lucide-react";
 
-export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock, isOnLock }) {
+export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock, isOnLock, screens }) {
     const canvasRef = useRef(null);
     const videoHiddenRef = useRef(null);
     const audioRef = useRef(null);
@@ -19,6 +19,8 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
     
     const [settings, setSettings] = useState({});
     const settingsRef = useRef({});
+
+    const [isScreenModalOpen, setIsScreenModalOpen] = useState(false);
 
     useEffect(() => {
         const updateSettings = () => {
@@ -242,6 +244,7 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     <Terminal className="w-4 h-4" />
                 </button>
                 <button className="px-4 py-2 bg-netover_text text-netover_bg rounded" onClick={() => {
+                    setIsScreenModalOpen(true);
                 }}>
                     <Wallpaper className="w-4 h-4" />
                 </button>
@@ -275,6 +278,65 @@ export default function ManageScreen({ launchService, setIsOnFocus, setIsOnLock,
                     <div className="absolute top-4 left-4 pointer-events-none text-red-500 font-bold select-none">
                         <div className="text-2xl">REMOTE LOCKING</div>
                         <div className="text-lg">Press RightCtrl to unlock</div>
+                    </div>
+                )}
+
+                {isScreenModalOpen && (
+                    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="bg-gray-900 border border-gray-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <header className="flex items-center justify-between p-4 border-b border-gray-800 bg-gray-900/50">
+                                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                    <Monitor className="w-5 h-5 text-netover_blue" />
+                                    Select Screen
+                                </h2>
+                                <button 
+                                    onClick={() => setIsScreenModalOpen(false)}
+                                    className="p-1 hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </header>
+                            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+                                {screens && screens.length > 0 ? (
+                                    screens.map((screen) => (
+                                        <button
+                                            key={screen.id}
+                                            onClick={() => {
+                                                launchService.sendData(`SWITCH_SCREEN ${screen.id}`);
+                                                setIsScreenModalOpen(false);
+                                            }}
+                                            className="w-full group flex items-start gap-4 p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-netover_blue rounded-lg transition-all text-left"
+                                        >
+                                            <div className="p-2 bg-gray-900 rounded group-hover:bg-netover_blue/10 transition-colors">
+                                                <Monitor className="w-6 h-6 text-gray-400 group-hover:text-netover_blue" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium text-white group-hover:text-netover_blue transition-colors">
+                                                    {screen.name || `Display ${screen.id}`}
+                                                    {screen.primary && (
+                                                        <span className="ml-2 text-[10px] px-1.5 py-0.5 bg-netover_blue/20 text-netover_blue rounded border border-netover_blue/30 uppercase tracking-wider font-bold">
+                                                            Primary
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-400 mt-0.5 font-mono">
+                                                    {screen.width} × {screen.height}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="py-8 text-center text-gray-500 italic">
+                                        No screens detected
+                                    </div>
+                                )}
+                            </div>
+                            <footer className="p-4 bg-gray-900/50 border-t border-gray-800 text-center">
+                                <p className="text-xs text-gray-500">
+                                    Click a screen to switch target
+                                </p>
+                            </footer>
+                        </div>
                     </div>
                 )}
             </main>

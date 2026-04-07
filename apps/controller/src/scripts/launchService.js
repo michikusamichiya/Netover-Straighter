@@ -19,7 +19,8 @@ export function createLaunchService({
   setErr,
   setStatus,
   onActive,
-  onUnactive
+  onUnactive,
+  onInfoMessage
 }) {
   let wss = null;
   let nok = null;
@@ -116,19 +117,29 @@ export function createLaunchService({
                 { urls: "stun:stun.voxgratia.org" }
               ]
             });
-            connection.ondatachannel = (channel) => {
+            connection.ondatachannel = (event) => {
+              const channel = event.channel;
               if (!channels) channels = {};
-              channels[channel.channel.label] = channel.channel;
-              channel.channel.onopen = () => {
-                console.log("RTC Open (answer");
-                active = true;
-                onActive();
-              };
-              channel.channel.onclose = () => {
-                active = false;
-                onUnactive();
-              };
-              console.log(channels);
+              channels[channel.label] = channel;
+
+              if (channel.label === "operation") {
+                channel.onopen = () => {
+                  console.log("Operation channel open");
+                  active = true;
+                  onActive();
+                };
+                channel.onclose = () => {
+                  console.log("Operation channel close");
+                  active = false;
+                  onUnactive();
+                };
+              } else if (channel.label === "info") {
+                channel.onmessage = (msg) => {
+                  console.log("Info channel message:", msg.data);
+                  if (onInfoMessage) onInfoMessage(msg.data);
+                };
+              }
+              console.log("Channels:", channels);
             };
             connection.onicecandidate = (ice) => {
               if (!ice.candidate) return;
@@ -245,7 +256,7 @@ export function createLaunchService({
 
   const sendData = (data) => {
     if (!channels) return;
-    const channel = Object.values(channels).find(c => c.readyState === 'open') || Object.values(channels)[0];
+    const channel = channels["operation"];
     if (channel && channel.readyState === 'open') {
       channel.send(data);
     }
